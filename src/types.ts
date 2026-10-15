@@ -24,7 +24,7 @@ export const levelMeta: Record<Level, LevelMeta> = {
   clip: {
     label: '片段级 Clip-level',
     shortLabel: '片段级',
-    description: '单镜头或单片段内的画面、声音、运动与视听质量',
+    description: '单镜头或单片段内的画面、声音、运动、视听质量与用户意图遵循能力',
     color: '#5872e8',
   },
   transition: {

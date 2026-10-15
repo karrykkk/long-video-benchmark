@@ -11,10 +11,14 @@ import './BenchmarkApp.css'
 import { INITIAL_DIMENSIONS } from './data'
 import { levelMeta, type BenchmarkDimension, type Level } from './types'
 
-const STORAGE_KEY = 'long-video-benchmark-rubric-v24'
-const PREVIOUS_STORAGE_KEY = 'long-video-benchmark-rubric-v23'
+const STORAGE_KEY = 'long-video-benchmark-rubric-v26'
+const RECENT_STORAGE_KEYS = [
+  'long-video-benchmark-rubric-v25',
+  'long-video-benchmark-rubric-v24',
+  'long-video-benchmark-rubric-v23',
+]
 const LEGACY_STORAGE_KEYS = [
-  PREVIOUS_STORAGE_KEY,
+  ...RECENT_STORAGE_KEYS,
   'long-video-benchmark-rubric-v22',
   'long-video-benchmark-rubric-v21',
   'long-video-benchmark-rubric-v20',
@@ -48,6 +52,51 @@ const VISUAL_QUALITY_CODE_MIGRATIONS: Record<
   'c4-1': { from: 'C4.1', to: 'C1.5' },
 }
 
+const USER_INTENT_CODE_MIGRATIONS: Record<
+  string,
+  { from: string; to: string }
+> = {
+  'g5-4': { from: 'G3.4', to: 'G3.5' },
+  'g5-5': { from: 'G3.5', to: 'G3.6' },
+  'g5-6': { from: 'G3.6', to: 'G3.7' },
+}
+
+const USER_INTENT_REFERENCE_MIGRATIONS: Record<string, string> = {
+  'G3.4': 'G3.5',
+  'G3.5': 'G3.6',
+  'G3.6': 'G3.7',
+}
+
+function migrateUserIntentCoverageInsertion(
+  dimensions: BenchmarkDimension[],
+) {
+  const needsMigration = dimensions.some(
+    (dimension) => dimension.id === 'g5-4' && dimension.code === 'G3.4',
+  )
+  if (!needsMigration) return dimensions
+
+  const renumberReferences = (text: string) =>
+    text.replace(
+      /G3\.[456]\b/g,
+      (code) => USER_INTENT_REFERENCE_MIGRATIONS[code] ?? code,
+    )
+
+  return dimensions.map((dimension) => {
+    const codeMigration = USER_INTENT_CODE_MIGRATIONS[dimension.id]
+    const shouldRenumberCode =
+      dimension.level === 'global' &&
+      dimension.parentCode === 'G3' &&
+      codeMigration?.from === dimension.code
+    return {
+      ...dimension,
+      code: shouldRenumberCode ? codeMigration.to : dimension.code,
+      definition: renumberReferences(dimension.definition),
+      scoringPoints: dimension.scoringPoints.map(renumberReferences),
+      errorTypes: dimension.errorTypes.map(renumberReferences),
+    }
+  })
+}
+
 function migrateVisualQualityDimension(
   dimension: BenchmarkDimension,
 ): BenchmarkDimension {
@@ -67,6 +116,26 @@ function migrateVisualQualityDimension(
   }
 }
 
+function migrateIntentParentName(
+  dimension: BenchmarkDimension,
+): BenchmarkDimension {
+  if (
+    dimension.level === 'global' &&
+    dimension.parentCode === 'G3' &&
+    dimension.parentName === '用户意图遵循度'
+  ) {
+    return { ...dimension, parentName: '全局级用户意图遵循度' }
+  }
+  if (
+    dimension.level === 'clip' &&
+    dimension.parentCode === 'C4' &&
+    dimension.parentName === '片段级用户意图遵循度'
+  ) {
+    return { ...dimension, parentName: '片段级输入意图遵循度' }
+  }
+  return dimension
+}
+
 function isVideoFunctionalityDimension(dimension: BenchmarkDimension) {
   return (
     dimension.level === 'global' &&
@@ -77,9 +146,11 @@ function isVideoFunctionalityDimension(dimension: BenchmarkDimension) {
 }
 
 function normalizeDimensions(dimensions: BenchmarkDimension[]) {
+  const coverageMigrated = migrateUserIntentCoverageInsertion(dimensions)
   return withoutScenarios(
-    dimensions
+    coverageMigrated
       .map(migrateVisualQualityDimension)
+      .map(migrateIntentParentName)
       .filter((dimension) => !isVideoFunctionalityDimension(dimension)),
   )
 }
@@ -321,7 +392,7 @@ function loadDimensions(): BenchmarkDimension[] {
       )
     if (
       currentSaved === null &&
-      legacySaved?.key !== PREVIOUS_STORAGE_KEY
+      !RECENT_STORAGE_KEYS.includes(legacySaved?.key ?? '')
     ) {
       const globalCodeMap: Record<string, string> = {
         G3: 'G2',
@@ -388,15 +459,24 @@ function loadDimensions(): BenchmarkDimension[] {
         }
       })
     }
+    const normalized = normalizeDimensions(migrated)
     if (currentSaved === null) {
-      const audioDimensionIds = ['c2-audio-1', 'c2-audio-2'] as const
-      audioDimensionIds.forEach((id) => {
-        if (migrated.some((item) => item.id === id)) return
-        const audioDimension = INITIAL_DIMENSIONS.find((item) => item.id === id)
-        if (audioDimension) migrated.push(structuredClone(audioDimension))
+      const currentVersionDimensionIds = [
+        'c2-audio-1',
+        'c2-audio-2',
+        'g3-coverage',
+        'c4-intent-text',
+        'c4-intent-image',
+        'c4-intent-video',
+        'c4-intent-audio',
+      ] as const
+      currentVersionDimensionIds.forEach((id) => {
+        if (normalized.some((item) => item.id === id)) return
+        const newDimension = INITIAL_DIMENSIONS.find((item) => item.id === id)
+        if (newDimension) normalized.push(structuredClone(newDimension))
       })
     }
-    return normalizeDimensions(migrated)
+    return normalized
   } catch {
     return INITIAL_DIMENSIONS
   }
