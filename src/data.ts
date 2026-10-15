@@ -1,6 +1,7 @@
 import type { BenchmarkDimension } from './types'
 
 const UPDATED_AT = new Date('2026-10-11T08:00:00Z').getTime()
+const AUDIO_QUALITY_UPDATED_AT = new Date('2026-10-15T05:53:00Z').getTime()
 
 export const INITIAL_DIMENSIONS: BenchmarkDimension[] = [
   {
@@ -42,9 +43,9 @@ export const INITIAL_DIMENSIONS: BenchmarkDimension[] = [
   {
     id: 'c2-1',
     level: 'clip',
-    parentCode: 'C2',
-    parentName: '运动合理性',
-    code: 'C2.1',
+    parentCode: 'C1',
+    parentName: '视觉质量',
+    code: 'C1.3',
     name: '主体动作自然性',
     definition:
       '评估人物、动物或拟人角色的动作是否满足解剖结构、运动惯性和动作意图，且关键动作阶段完整可辨。',
@@ -60,9 +61,9 @@ export const INITIAL_DIMENSIONS: BenchmarkDimension[] = [
   {
     id: 'c2-2',
     level: 'clip',
-    parentCode: 'C2',
-    parentName: '运动合理性',
-    code: 'C2.2',
+    parentCode: 'C1',
+    parentName: '视觉质量',
+    code: 'C1.4',
     name: '物理规律与交互合理性',
     definition:
       '评估物体运动、碰撞、流体、布料和主体—物体交互是否符合场景设定下的重力、惯性、接触与因果规律。',
@@ -74,6 +75,42 @@ export const INITIAL_DIMENSIONS: BenchmarkDimension[] = [
     ],
     errorTypes: ['悬浮/无重力', '接触穿透', '抓取滑脱', '碰撞无反馈', '流体或布料违和'],
     updatedAt: UPDATED_AT,
+  },
+  {
+    id: 'c2-audio-1',
+    level: 'clip',
+    parentCode: 'C2',
+    parentName: '音频质量',
+    code: 'C2.1',
+    name: '人声生成质量',
+    definition:
+      '在模型支持原生音频时，评估片段中的对白、旁白、演唱等人声是否清晰、自然、稳定且可懂。口型与画面的同步关系由 C3.1 评估。',
+    scoringPoints: [
+      '发音与吐字清楚完整，无含混、吞字或异常重复',
+      '音色、音高与音量连续稳定，无机械感、抖动或断裂',
+      '语速、重音、停连和情绪表达自然，符合语句内容',
+      '多角色人声可区分，不发生串音或无故换声',
+    ],
+    errorTypes: ['发音含混/吞字', '金属音/机器人音', '音色或音高突变', '人声抖动/断裂', '多角色串音/换声'],
+    updatedAt: AUDIO_QUALITY_UPDATED_AT,
+  },
+  {
+    id: 'c2-audio-2',
+    level: 'clip',
+    parentCode: 'C2',
+    parentName: '音频质量',
+    code: 'C2.2',
+    name: '音效、环境声与音乐质量',
+    definition:
+      '在模型支持原生音频时，评估片段中的环境声、动作音效与音乐是否自然、完整且具有可用的保真度，并检查对白、音效和音乐之间的混音是否清楚平衡。声音与可见事件的同步关系由 C3.1 评估。',
+    scoringPoints: [
+      '环境声与动作音效质感自然、细节清楚，无明显合成伪影或机械循环',
+      '音乐的音色、节奏与和声连贯，不出现随机跳变或异常中断',
+      '对白、音效与音乐层次清楚、响度平衡，关键信息不被遮蔽',
+      '整体声音无明显底噪、失真、爆音、削波或动态范围异常',
+    ],
+    errorTypes: ['音效失真/合成伪影', '环境声机械循环', '音乐节奏/和声断裂', '混音失衡/声音遮蔽', '底噪/爆音/削波'],
+    updatedAt: AUDIO_QUALITY_UPDATED_AT,
   },
   {
     id: 'g5-1',
@@ -494,9 +531,9 @@ export const INITIAL_DIMENSIONS: BenchmarkDimension[] = [
   {
     id: 'c4-1',
     level: 'clip',
-    parentCode: 'C4',
-    parentName: '文字渲染能力',
-    code: 'C4.1',
+    parentCode: 'C1',
+    parentName: '视觉质量',
+    code: 'C1.5',
     name: '画面文字渲染准确性',
     definition:
       '评估片段中需要出现的文字（招牌、字幕、标题、产品包装与 Logo、屏幕界面、手写文字等）是否正确、清晰、稳定地渲染：内容与用户要求逐字一致，字形笔画正确、可辨读，排版与透视贴合所在物体表面，并在镜头与物体运动中保持稳定；中文、英文等多语种及混排都应正确。用户没有要求文字的地方，不应生成无意义的乱码文字。同一文字在隔开的片段之间是否一致，由 G2.1、G2.2 评估。',
@@ -606,36 +643,6 @@ export const INITIAL_DIMENSIONS: BenchmarkDimension[] = [
       '主题再现无法辨认',
       '整体响度骤变',
       '后段音质退化',
-    ],
-    updatedAt: UPDATED_AT,
-  },
-  {
-    id: 'g6-1',
-    level: 'global',
-    parentCode: 'G4',
-    parentName: '视频功能性',
-    code: 'G4.1',
-    name: '视频功能性',
-    definition:
-      '评估完整视频是否达成其所属场景的核心目的：具身场景看视频是否完成了指定任务；广告场景看视频是否让观众想购买该商品；真人短剧看观众看完这一段后是否想看下一段；动漫游戏看是否激发观众想玩或想追看；专业电影看观众是否被打动、主题是否清楚传达；MV 看观众是否愿意重复观看或分享，Vlog 看观众是否愿意关注博主。具身任务可用客观的成功/失败判定；广告、短剧等可由评测员按 1–5 分评出购买意愿、追看意愿等指标。',
-    scoringPoints: [
-      '视频始终围绕所属场景的核心目的组织内容，不偏离：例如广告始终以产品为中心，具身视频始终围绕任务推进',
-      '核心目的达成：具身任务的最终状态正确且完整；广告让观众产生购买意愿；短剧让观众产生追看下一段的意愿',
-      '实现目的所需的关键信息被有效传达：任务结果清楚可见，产品是什么、好在哪里一目了然，剧情走向与悬念能被看懂',
-      '结尾服务核心目的：具身视频给出完成状态的确认画面，广告落在品牌与购买行动号召上，短剧收在悬念或情绪钩子上',
-      '不出现削弱功能的问题：如任务伪完成、产品被遮挡或变形、悬念被提前说尽',
-    ],
-    errorTypes: [
-      '偏离场景核心目的',
-      '任务未完成/伪完成',
-      '任务结果无法验证',
-      '卖点不清/产品吸引力不足',
-      '产品或品牌信息缺失',
-      '缺少购买行动号召',
-      '结尾缺少悬念钩子',
-      '悬念提前泄底',
-      '情绪感染力不足',
-      '关键信息无法理解',
     ],
     updatedAt: UPDATED_AT,
   },

@@ -11,8 +11,10 @@ import './BenchmarkApp.css'
 import { INITIAL_DIMENSIONS } from './data'
 import { levelMeta, type BenchmarkDimension, type Level } from './types'
 
-const STORAGE_KEY = 'long-video-benchmark-rubric-v23'
+const STORAGE_KEY = 'long-video-benchmark-rubric-v24'
+const PREVIOUS_STORAGE_KEY = 'long-video-benchmark-rubric-v23'
 const LEGACY_STORAGE_KEYS = [
+  PREVIOUS_STORAGE_KEY,
   'long-video-benchmark-rubric-v22',
   'long-video-benchmark-rubric-v21',
   'long-video-benchmark-rubric-v20',
@@ -36,6 +38,51 @@ const LEGACY_STORAGE_KEYS = [
   'long-video-benchmark-rubric-v2',
   'long-video-benchmark-rubric-v1',
 ]
+
+const VISUAL_QUALITY_CODE_MIGRATIONS: Record<
+  string,
+  { from: string; to: string }
+> = {
+  'c2-1': { from: 'C2.1', to: 'C1.3' },
+  'c2-2': { from: 'C2.2', to: 'C1.4' },
+  'c4-1': { from: 'C4.1', to: 'C1.5' },
+}
+
+function migrateVisualQualityDimension(
+  dimension: BenchmarkDimension,
+): BenchmarkDimension {
+  const migration = VISUAL_QUALITY_CODE_MIGRATIONS[dimension.id]
+  if (
+    dimension.level !== 'clip' ||
+    !migration ||
+    dimension.code !== migration.from
+  ) {
+    return dimension
+  }
+  return {
+    ...dimension,
+    parentCode: 'C1',
+    parentName: '视觉质量',
+    code: migration.to,
+  }
+}
+
+function isVideoFunctionalityDimension(dimension: BenchmarkDimension) {
+  return (
+    dimension.level === 'global' &&
+    (dimension.parentCode === 'G4' ||
+      dimension.id === 'g6-1' ||
+      ['视频功能性', '整体表现力'].includes(dimension.parentName))
+  )
+}
+
+function normalizeDimensions(dimensions: BenchmarkDimension[]) {
+  return withoutScenarios(
+    dimensions
+      .map(migrateVisualQualityDimension)
+      .filter((dimension) => !isVideoFunctionalityDimension(dimension)),
+  )
+}
 
 type IconName =
   | 'search'
@@ -134,27 +181,16 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
 function loadDimensions(): BenchmarkDimension[] {
   try {
     const currentSaved = window.localStorage.getItem(STORAGE_KEY)
-    const legacySaved = LEGACY_STORAGE_KEYS.map((key) =>
-      window.localStorage.getItem(key),
-    ).find((value) => value !== null)
-    const saved = currentSaved ?? legacySaved
+    const legacySaved = LEGACY_STORAGE_KEYS.map((key) => ({
+      key,
+      value: window.localStorage.getItem(key),
+    })).find(({ value }) => value !== null)
+    const saved = currentSaved ?? legacySaved?.value
     if (!saved) return INITIAL_DIMENSIONS
     const parsed: unknown = JSON.parse(saved)
     if (!Array.isArray(parsed)) return INITIAL_DIMENSIONS
     const migrated = (parsed as BenchmarkDimension[])
       .map((dimension) => {
-        if (
-          dimension.id === 'g5-1' &&
-          dimension.parentCode === 'G5' &&
-          dimension.parentName === '整体表现力'
-        ) {
-          return {
-            ...dimension,
-            id: 'g6-1',
-            parentCode: 'G6',
-            code: 'G6.1',
-          }
-        }
         if (
           dimension.level === 'global' &&
           dimension.parentCode === 'G2' &&
@@ -196,13 +232,6 @@ function loadDimensions(): BenchmarkDimension[] {
           ['镜头衔接', '剪辑衔接'].includes(dimension.parentName)
         ) {
           return { ...dimension, parentName: '主体衔接' }
-        }
-        if (
-          dimension.level === 'global' &&
-          dimension.parentCode === 'G6' &&
-          dimension.parentName === '整体表现力'
-        ) {
-          return { ...dimension, parentName: '视频功能性' }
         }
         if (dimension.id === 't1-2' && dimension.parentCode === 'T1') {
           return {
@@ -290,15 +319,17 @@ function loadDimensions(): BenchmarkDimension[] {
               ))
           ),
       )
-    if (currentSaved === null) {
+    if (
+      currentSaved === null &&
+      legacySaved?.key !== PREVIOUS_STORAGE_KEY
+    ) {
       const globalCodeMap: Record<string, string> = {
         G3: 'G2',
         G5: 'G3',
-        G6: 'G4',
       }
       const renumber = (text: string) =>
         text.replace(
-          /G([356])\.(\d)/g,
+          /G([35])\.(\d)/g,
           (match, group: string, sub: string) =>
             globalCodeMap[`G${group}`]
               ? `${globalCodeMap[`G${group}`]}.${sub}`
@@ -344,7 +375,6 @@ function loadDimensions(): BenchmarkDimension[] {
         't4-1',
         'g1-1',
         'g3-1',
-        'g6-1',
       ]
       revisedDimensionIds.forEach((id) => {
         const index = migrated.findIndex((item) => item.id === id)
@@ -358,7 +388,15 @@ function loadDimensions(): BenchmarkDimension[] {
         }
       })
     }
-    return withoutScenarios(migrated)
+    if (currentSaved === null) {
+      const audioDimensionIds = ['c2-audio-1', 'c2-audio-2'] as const
+      audioDimensionIds.forEach((id) => {
+        if (migrated.some((item) => item.id === id)) return
+        const audioDimension = INITIAL_DIMENSIONS.find((item) => item.id === id)
+        if (audioDimension) migrated.push(structuredClone(audioDimension))
+      })
+    }
+    return normalizeDimensions(migrated)
   } catch {
     return INITIAL_DIMENSIONS
   }
@@ -614,7 +652,7 @@ function BenchmarkApp() {
       if (!imported || imported.length === 0) {
         throw new Error('No dimensions')
       }
-      setDimensions(withoutScenarios(imported as BenchmarkDimension[]))
+      setDimensions(normalizeDimensions(imported as BenchmarkDimension[]))
       setLevelFilter('all')
       setParentFilter('all')
       setToast(`已导入 ${imported.length} 个子维度`)
@@ -957,7 +995,7 @@ function BenchmarkApp() {
                       onChange={(event) =>
                         setDraft({ ...draft, code: event.target.value })
                       }
-                      placeholder="例如 C2.3"
+                      placeholder="例如 C1.3"
                     />
                   </label>
                   <label>
@@ -977,7 +1015,7 @@ function BenchmarkApp() {
                       onChange={(event) =>
                         setDraft({ ...draft, parentName: event.target.value })
                       }
-                      placeholder="例如 运动合理性"
+                      placeholder="例如 视觉质量"
                     />
                   </label>
                   <label className="full">
